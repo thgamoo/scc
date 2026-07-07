@@ -7,6 +7,7 @@ const DAY_MAP: Record<string, string[]> = {
   TH: ["Thu"],
   F: ["Fri"],
   MW: ["Mon", "Wed"],
+  TR: ["Tue", "Thu"],
   TUTH: ["Tue", "Thu"],
   WF: ["Wed", "Fri"],
   MWF: ["Mon", "Wed", "Fri"],
@@ -50,12 +51,30 @@ export interface TimeSlot {
   end: number;
 }
 
+/** Parse REC/LAB info from note field, e.g. "REC M 12:00-12:55 PM" or "LAB TUTH 2:00-3:20 PM" */
+function parseRecSlots(note?: string): TimeSlot[] {
+  if (!note) return [];
+  // Format: "REC|LAB DAYS START-END AMPM" (AM/PM may be on start, end, or both)
+  const match = note.match(/^(?:REC|LAB)\s+([A-Z]+)\s+(\d{1,2}:\d{2})\s*(?:(AM|PM)\s*)?-\s*(\d{1,2}:\d{2})\s*(AM|PM)/i);
+  if (!match) return [];
+  const recDays = parseDays(match[1]);
+  const endAmpm = match[5].toUpperCase();
+  const startAmpm = match[3]?.toUpperCase() ?? endAmpm;
+  const recStart = parseTime(`${match[2]} ${startAmpm}`);
+  const recEnd = parseTime(`${match[4]} ${endAmpm}`);
+  if (recStart < 0 || recEnd < 0 || recDays.length === 0) return [];
+  return recDays.map((day) => ({ day, start: recStart, end: recEnd }));
+}
+
 export function getCourseSlots(course: Course): TimeSlot[] {
   const days = parseDays(course.days);
   const start = parseTime(course.startTime);
   const end = parseTime(course.endTime);
-  if (start < 0 || end < 0 || days.length === 0) return [];
-  return days.map((day) => ({ day, start, end }));
+  const lecSlots = start < 0 || end < 0 || days.length === 0
+    ? []
+    : days.map((day) => ({ day, start, end }));
+  const recSlots = parseRecSlots(course.note);
+  return [...lecSlots, ...recSlots];
 }
 
 export function hasConflict(a: TimeSlot[], b: TimeSlot[]): boolean {
@@ -88,10 +107,11 @@ export function getTimeBounds(courses: Course[]): { earliest: number; latest: nu
   let earliest = 24 * 60;
   let latest = 0;
   for (const c of courses) {
-    const start = parseTime(c.startTime);
-    const end = parseTime(c.endTime);
-    if (start >= 0 && start < earliest) earliest = start;
-    if (end >= 0 && end > latest) latest = end;
+    const slots = getCourseSlots(c);
+    for (const slot of slots) {
+      if (slot.start < earliest) earliest = slot.start;
+      if (slot.end > latest) latest = slot.end;
+    }
   }
   // Default to 9am-6pm if no courses
   if (earliest >= latest) {

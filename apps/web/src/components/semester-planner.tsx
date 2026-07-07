@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
-import { SPRING_2026_COURSES, FALL_2026_COURSES, SEMESTER_LABELS } from "@/data/courses";
+import { SPRING_2028_COURSES, FALL_2028_COURSES, SEMESTER_LABELS } from "@/data/courses";
+import { SBU_FALL_2028_COURSES, SBU_SPRING_2029_COURSES } from "@/data/sbu-courses";
+import { SBU_SUMMER_2028_COURSES } from "@/data/summer-courses";
 import type { Course } from "@/data/requirements";
-import type { useSemesterPlan } from "@/hooks/use-semester-plan";
+import type { useSemesterPlan, SemesterKey } from "@/hooks/use-semester-plan";
 import {
   getCourseSlots,
   findConflicts,
@@ -12,6 +14,7 @@ import {
   formatTime,
   ALL_DAYS,
 } from "@/lib/schedule";
+import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Plus, X, AlertTriangle, Trash2 } from "lucide-react";
 
 type SemesterPlanHook = ReturnType<typeof useSemesterPlan>;
@@ -19,6 +22,8 @@ type SemesterPlanHook = ReturnType<typeof useSemesterPlan>;
 interface SemesterPlannerProps {
   planHook: SemesterPlanHook;
   completedSBCs: string[];
+  semester: SemesterKey;
+  onSemesterChange: (s: SemesterKey) => void;
 }
 
 const COLORS = [
@@ -32,12 +37,23 @@ const COLORS = [
   "bg-pink-500/20 border-pink-500/40 text-pink-700 dark:text-pink-300",
 ];
 
-export function SemesterPlanner({ planHook, completedSBCs }: SemesterPlannerProps) {
-  const { getPlannedCourses, addToPlan, removeFromPlan, clearPlan } = planHook;
-  const [semester, setSemester] = useState<"spring2026" | "fall2026">("fall2026");
-  const [search, setSearch] = useState("");
+const PLANNER_SEMESTERS: SemesterKey[] = ["spring2028", "sbuSummer2028", "sbuFall2028", "sbuSpring2029"];
 
-  const allCourses = semester === "spring2026" ? SPRING_2026_COURSES : FALL_2026_COURSES;
+const SEMESTER_COURSES: Record<SemesterKey, Course[]> = {
+  spring2028: SPRING_2028_COURSES,
+  fall2028: FALL_2028_COURSES,
+  sbuSummer2028: SBU_SUMMER_2028_COURSES,
+  sbuFall2028: SBU_FALL_2028_COURSES,
+  sbuSpring2029: SBU_SPRING_2029_COURSES,
+};
+
+export function SemesterPlanner({ planHook, completedSBCs, semester, onSemesterChange }: SemesterPlannerProps) {
+  const { getPlannedCourses, addToPlan, removeFromPlan, clearPlan } = planHook;
+  const [search, setSearch] = useState("");
+  const [filter2cr, setFilter2cr] = useState(false);
+  const [filter4cr, setFilter4cr] = useState(false);
+
+  const allCourses = SEMESTER_COURSES[semester];
   const planned = getPlannedCourses(semester);
 
   const totalCredits = planned.reduce((sum, c) => sum + c.credits, 0);
@@ -69,15 +85,21 @@ export function SemesterPlanner({ planHook, completedSBCs }: SemesterPlannerProp
   }, [allCourses, planned]);
 
   const filteredAvailable = useMemo(() => {
-    if (!search) return availableCourses;
+    let list = availableCourses;
+    if (filter2cr || filter4cr) {
+      list = list.filter((c) => (filter2cr && c.credits === 2) || (filter4cr && c.credits === 4));
+    }
+    if (!search) return list;
     const q = search.toLowerCase();
-    return availableCourses.filter(
+    return list.filter(
       (c) =>
         c.title.toLowerCase().includes(q) ||
         `${c.subject} ${c.courseNum}`.toLowerCase().includes(q) ||
-        c.instructor.toLowerCase().includes(q)
+        c.instructor.toLowerCase().includes(q) ||
+        c.sbc.some((s) => s.toLowerCase().includes(q)) ||
+        (c.note && c.note.toLowerCase().includes(q))
     );
-  }, [availableCourses, search]);
+  }, [availableCourses, search, filter2cr, filter4cr]);
 
   // Schedule grid
   const { earliest, latest } = useMemo(() => getTimeBounds(planned), [planned]);
@@ -94,12 +116,12 @@ export function SemesterPlanner({ planHook, completedSBCs }: SemesterPlannerProp
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Schedule</CardTitle>
             <div className="flex items-center gap-2">
-              {(["spring2026", "fall2026"] as const).map((s) => (
+              {PLANNER_SEMESTERS.map((s) => (
                 <Button
                   key={s}
                   size="sm"
                   variant={semester === s ? "default" : "outline"}
-                  onClick={() => setSemester(s)}
+                  onClick={() => onSemesterChange(s)}
                   className="h-7 text-xs"
                 >
                   {SEMESTER_LABELS[s]}
@@ -174,13 +196,13 @@ export function SemesterPlanner({ planHook, completedSBCs }: SemesterPlannerProp
                       >
                         {dayCourses.map((c) => {
                           const slots = getCourseSlots(c).filter((s) => s.day === day);
-                          return slots.map((slot) => {
+                          return slots.map((slot, slotIdx) => {
                             const top = ((slot.start - earliest) / 60) * 60;
                             const height = ((slot.end - slot.start) / 60) * 60;
                             const color = colorMap.get(c.classNbr) ?? COLORS[0];
                             return (
                               <div
-                                key={`${c.classNbr}-${day}`}
+                                key={`${c.classNbr}-${day}-${slotIdx}`}
                                 className={`absolute inset-x-0.5 overflow-hidden rounded border px-1 py-0.5 ${color}`}
                                 style={{ top, height }}
                               >
@@ -247,13 +269,23 @@ export function SemesterPlanner({ planHook, completedSBCs }: SemesterPlannerProp
       <Card className="max-h-[calc(100svh-120px)] overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Add Courses</CardTitle>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-1 flex h-7 w-full rounded-md border px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
-          />
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-7 min-w-0 flex-1 rounded-md border px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none"
+            />
+            <label className="flex shrink-0 items-center gap-1 text-[10px]">
+              <Checkbox checked={filter2cr} onCheckedChange={(v) => setFilter2cr(!!v)} className="h-3.5 w-3.5" />
+              2cr
+            </label>
+            <label className="flex shrink-0 items-center gap-1 text-[10px]">
+              <Checkbox checked={filter4cr} onCheckedChange={(v) => setFilter4cr(!!v)} className="h-3.5 w-3.5" />
+              4cr
+            </label>
+          </div>
         </CardHeader>
         <CardContent className="overflow-y-auto" style={{ maxHeight: "calc(100svh - 240px)" }}>
           <div className="space-y-0.5">
@@ -296,6 +328,12 @@ export function SemesterPlanner({ planHook, completedSBCs }: SemesterPlannerProp
                       <span>{course.days} {course.startTime}</span>
                       <span>&middot;</span>
                       <span>{course.instructor}</span>
+                      {course.note && (
+                        <>
+                          <span>&middot;</span>
+                          <span className="text-orange-500">{course.note}</span>
+                        </>
+                      )}
                     </div>
                     {hasTimeConflict && (
                       <div className="text-[9px] text-orange-500">
