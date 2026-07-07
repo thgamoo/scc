@@ -176,11 +176,35 @@ export function App() {
 
         <TabsContent value="checklist">
           <Tabs value={subTab} onValueChange={handleSubTabChange} className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="courses">My Courses</TabsTrigger>
-              <TabsTrigger value="major">Major</TabsTrigger>
-              <TabsTrigger value="sbc">SBC</TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between">
+              <TabsList>
+                <TabsTrigger value="courses">My Courses</TabsTrigger>
+                <TabsTrigger value="major">Major</TabsTrigger>
+                <TabsTrigger value="sbc">SBC</TabsTrigger>
+              </TabsList>
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary" />
+                  Completed
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" />
+                  Spring 2028
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500" />
+                  Summer 2028
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-blue-500" />
+                  Fall 2028
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+                  Spring 2029
+                </span>
+              </div>
+            </div>
 
             <TabsContent value="courses">
               <CourseBrowser

@@ -15,7 +15,7 @@ import {
   ALL_DAYS,
 } from "@/lib/schedule";
 import { Checkbox } from "@workspace/ui/components/checkbox";
-import { Plus, X, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, X, AlertTriangle, Trash2, RotateCcw } from "lucide-react";
 
 type SemesterPlanHook = ReturnType<typeof useSemesterPlan>;
 
@@ -48,7 +48,7 @@ const SEMESTER_COURSES: Record<SemesterKey, Course[]> = {
 };
 
 export function SemesterPlanner({ planHook, completedSBCs, semester, onSemesterChange }: SemesterPlannerProps) {
-  const { getPlannedCourses, addToPlan, removeFromPlan, clearPlan } = planHook;
+  const { getPlannedCourses, addToPlan, removeFromPlan, clearPlan, clearAllPlans } = planHook;
   const [search, setSearch] = useState("");
   const [filter2cr, setFilter2cr] = useState(false);
   const [filter4cr, setFilter4cr] = useState(false);
@@ -144,6 +144,15 @@ export function SemesterPlanner({ planHook, completedSBCs, semester, onSemesterC
                 Clear
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={clearAllPlans}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" />
+              Reset All
+            </Button>
           </div>
         </CardHeader>
         <CardContent>

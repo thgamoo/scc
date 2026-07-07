@@ -127,5 +127,9 @@ export function useSemesterPlan() {
     setPlan((prev) => ({ ...prev, [semester]: [] }));
   }, []);
 
-  return { plan, getPlannedCourses, addToPlan, removeFromPlan, clearPlan };
+  const clearAllPlans = useCallback(() => {
+    setPlan({ ...defaultPlan });
+  }, []);
+
+  return { plan, getPlannedCourses, addToPlan, removeFromPlan, clearPlan, clearAllPlans };
 }
