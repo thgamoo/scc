@@ -29,5 +29,8 @@ dist-ssr
 *.sln
 *.sw?
 
+# docs (personal PDFs, transcripts)
+docs/
+
 # typescript
 *.tsbuildinfo
